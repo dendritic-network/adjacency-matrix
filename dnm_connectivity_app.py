@@ -8,9 +8,11 @@ from types import SimpleNamespace
 import torch
 import networkx as nx
 
+# --- All Model and Helper Functions remain the same ---
+# (Code from line 12 to 503 is unchanged)
+
 # -----------------------------------------------------------------------------
 # --- MODEL 1: LOCAL (BOUNDARY-AWARE) DENDRITIC MODEL FUNCTIONS ---
-# (This section is unchanged)
 # -----------------------------------------------------------------------------
 def _find_closest_free_block(size, ideal_center, occupied_slots, N_in):
     if size <= 0: return []
@@ -197,7 +199,6 @@ def create_dendritic_sparse_scheduler_local(sparsity, w, args):
 
 # -----------------------------------------------------------------------------
 # --- MODEL 2: ORIGINAL (MODULO-WRAPPING) DENDRITIC MODEL FUNCTIONS ---
-# (This section is unchanged)
 # -----------------------------------------------------------------------------
 def _adjust_samples_original(samples, target_total):
     samples, rounded = np.array(samples), np.round(samples).astype(int)
@@ -320,7 +321,6 @@ def create_dendritic_sparse_scheduler_original(sparsity, w, args):
 
 # -----------------------------------------------------------------------------
 # --- SHARED & UTILITY FUNCTIONS ---
-# (This section is unchanged)
 # -----------------------------------------------------------------------------
 def get_closest_nodes_centered(i, N, count):
     indices = [i]
@@ -392,7 +392,6 @@ def create_dnm_connectivity(model_type, num_inputs, num_outputs, sparsity, num_d
 
 # -----------------------------------------------------------------------------
 # --- GRAPHING AND ANALYSIS FUNCTIONS ---
-# (This section is unchanged, but the corrected version is provided)
 # -----------------------------------------------------------------------------
 def create_network_graph(masks, layer_sizes):
     G = nx.DiGraph()
@@ -432,9 +431,19 @@ def plot_network_graph(G, layer_sizes, ax):
 # -----------------------------------------------------------------------------
 st.title("Dendritic Network Model Visualization")
 
-
+# --- THIS IS THE SECTION TO BE MODIFIED ---
+st.sidebar.header("Network Architecture")
+# This is the old, incorrect logic
+# scale_factor = st.sidebar.select_slider(
+# 'Network Scale',
+# options=[0.25, 0.5, 1.0],
+# value=0.25,
+# format_func=lambda x: f'{int(x*100)}% (e.g., {int(784*x)}x{int(1568*x)})'
+# )
 base_layer_sizes = [784, 1568, 1568, 1568]
 layer_sizes = [int(s * 0.25) for s in base_layer_sizes]
+st.sidebar.write(f"**Current Dimensions:** `{layer_sizes[0]}` → `{layer_sizes[1]}` → `{layer_sizes[2]}` → `{layer_sizes[3]}`")
+# --- END OF SECTION TO BE MODIFIED ---
 
 
 # Sidebar parameters for the model
@@ -444,7 +453,7 @@ sparsity = st.sidebar.slider("Sparsity", 0.5, 0.99, 0.9, 0.01)
 num_dendrites = st.sidebar.slider("Avg. Dendrites (M)", 1, 20, 4)
 gamma = st.sidebar.slider("Avg. Receptive Field (Gamma)", 0.0, 1.0, 1.0, 0.05)
 st.sidebar.subheader("Parameter Distributions")
-dendrite_dist = st.sidebar.selectbox("Dendritic Distribution", ["fixed", "gaussian", "uniform", "spatial_gaussian", "spatial_inversegaussian"])
+dendrite_dist = st.sidebar.selectbox("Dendrite (M) Dist.", ["fixed", "gaussian", "uniform", "spatial_gaussian", "spatial_inversegaussian"])
 gamma_dist = st.sidebar.selectbox("Receptive Field Width Distribution", ["fixed", "gaussian", "uniform", "spatial_gaussian", "spatial_inversegaussian"])
 degree_dist = st.sidebar.selectbox("Degree Distribution", ["fixed", "uniform", "gaussian", "spatial_gaussian", "spatial_inversegaussian"])
 synaptic_dist = st.sidebar.selectbox("Synaptic Distribution", ["fixed", "uniform", "spatial_gaussian", "spatial_inversegaussian"])
