@@ -530,45 +530,30 @@ def create_network_graph(masks, layer_sizes):
     return G
 
 def plot_network_graph(G, layer_sizes, ax):
-    """Plot the network graph with layers arranged horizontally using a colormap for node colors."""
+    """Plot the network graph with layers arranged horizontally"""
     pos = {}
     for layer_idx, size in enumerate(layer_sizes):
-        y_positions = np.linspace(0, 1, size)
+        # CORRECTED LINE: Generate y-positions from 1 (top) to 0 (bottom)
+        y_positions = np.linspace(1, 0, size)
         for i in range(size):
-            node_idx = int(np.sum(layer_sizes[:layer_idx])) + i # Ensure node_idx is int
+            # This line calculates the absolute node index. Note the int() cast for safety.
+            node_idx = int(np.sum(layer_sizes[:layer_idx])) + i
             pos[node_idx] = (layer_idx, y_positions[i])
 
-    # Plot edges first to be behind nodes
     for edge in G.edges():
         ax.plot([pos[edge[0]][0], pos[edge[1]][0]], [pos[edge[0]][1], pos[edge[1]][1]], 'gray', alpha=0.1, lw=0.5)
 
-    # --- MODIFICATION START ---
-    # Get a colormap (e.g., 'viridis', 'plasma', 'cividis')
-    cmap = plt.get_cmap('viridis')
+    colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728']
+    for layer_idx in range(len(layer_sizes)):
+        nodes = range(int(np.sum(layer_sizes[:layer_idx])), int(np.sum(layer_sizes[:layer_idx+1])))
+        # Check if nodes exist in pos before plotting
+        nodes_in_pos = [n for n in nodes if n in pos]
+        if nodes_in_pos:
+            ax.scatter([pos[n][0] for n in nodes_in_pos], [pos[n][1] for n in nodes_in_pos], s=10, color=colors[layer_idx], label=f'Layer {layer_idx}')
     
-    # Determine the number of unique layers to assign colors
-    num_layers = len(layer_sizes)
-
-    # Draw nodes
-    for layer_idx in range(num_layers):
-        start_node_idx = int(np.sum(layer_sizes[:layer_idx]))
-        end_node_idx = int(np.sum(layer_sizes[:layer_idx+1]))
-        layer_nodes = range(start_node_idx, end_node_idx)
-        
-        if layer_nodes: # Only plot if there are nodes in the layer
-            x = [pos[node][0] for node in layer_nodes]
-            y = [pos[node][1] for node in layer_nodes]
-            
-            # Map the layer_idx to a color in the colormap
-            # Normalize layer_idx to [0, 1] range for the colormap
-            color = cmap(layer_idx / (num_layers - 1) if num_layers > 1 else 0.5)
-            
-            ax.scatter(x, y, s=10, color=color, label=f'Layer {layer_idx}')
-    # --- MODIFICATION END ---
-
     ax.axis('off')
     ax.set_title('Network Structure')
-    ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.05), ncol=num_layers)
+    ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.05), ncol=len(layer_sizes))
     
 # -----------------------------------------------------------------------------
 # --- STREAMLIT UI ---
