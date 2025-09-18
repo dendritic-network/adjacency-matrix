@@ -638,14 +638,14 @@ layer_sizes = [784, 1568, 1568, 1568]
 # Sidebar parameters
 st.sidebar.header("Network Parameters")
 sparsity = st.sidebar.slider("Sparsity", 0.5, 0.99, 0.9)
-num_dendrites = st.sidebar.slider("Avg Dendrites (M)", 1, 31, 15, step=2)  # FIX 3
-gamma = st.sidebar.slider("Avg Window Size (gamma)", 0.0, 1.0, 0.5)  # FIX 4
+num_dendrites = st.sidebar.slider("Avg Number of Dendrites (M)", 1, 11, 3, step=2)  # FIX 3
+gamma = st.sidebar.slider("Avg Receptive Field Width (alpha)", 0.0, 1.0, 1.0)  # FIX 4
 
 st.sidebar.subheader("Distributions")
-dendrite_dist = st.sidebar.selectbox("Dendrite Distribution", [
+dendrite_dist = st.sidebar.selectbox("Dendritic Distribution", [
     "fixed", "gaussian", "uniform", "spatial_gaussian", "spatial_inversegaussian"
 ])
-gamma_dist = st.sidebar.selectbox("Window Size Distribution", [
+gamma_dist = st.sidebar.selectbox("Receptive Field Width Distribution", [
     "fixed", "gaussian", "uniform", "spatial_gaussian", "spatial_inversegaussian"
 ])
 degree_dist = st.sidebar.selectbox("Degree Distribution", [
