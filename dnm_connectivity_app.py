@@ -8,8 +8,6 @@ from types import SimpleNamespace
 import torch
 import networkx as nx
 
-st.set_option('deprecation.showPyplotGlobalUse', False)
-
 # -----------------------------------------------------------------------------
 # --- MODEL 1: LOCAL (BOUNDARY-AWARE) DENDRITIC MODEL FUNCTIONS ---
 # -----------------------------------------------------------------------------
