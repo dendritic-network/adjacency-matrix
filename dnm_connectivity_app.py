@@ -8,11 +8,9 @@ from types import SimpleNamespace
 import torch
 import networkx as nx
 
-# --- All Model and Helper Functions remain the same ---
-# (Code from line 12 to 503 is unchanged)
-
 # -----------------------------------------------------------------------------
-# --- MODEL 1: LOCAL (BOUNDARY-AWARE) DENDRITIC MODEL FUNCTIONS ---
+# --- MODEL AND UTILITY FUNCTIONS ---
+# (This entire section is unchanged)
 # -----------------------------------------------------------------------------
 def _find_closest_free_block(size, ideal_center, occupied_slots, N_in):
     if size <= 0: return []
@@ -197,9 +195,6 @@ def create_dendritic_sparse_scheduler_local(sparsity, w, args):
     _apply_rewiring(adj, N_in, N_out, args.random_rewiring)
     return torch.LongTensor(adj).to(w.device)
 
-# -----------------------------------------------------------------------------
-# --- MODEL 2: ORIGINAL (MODULO-WRAPPING) DENDRITIC MODEL FUNCTIONS ---
-# -----------------------------------------------------------------------------
 def _adjust_samples_original(samples, target_total):
     samples, rounded = np.array(samples), np.round(samples).astype(int)
     clipped, current_total = np.clip(rounded, 1, None), np.sum(clipped)
@@ -319,9 +314,6 @@ def create_dendritic_sparse_scheduler_original(sparsity, w, args):
     _apply_rewiring(adj, N_in, N_out, args.random_rewiring)
     return torch.LongTensor(adj).to(w.device)
 
-# -----------------------------------------------------------------------------
-# --- SHARED & UTILITY FUNCTIONS ---
-# -----------------------------------------------------------------------------
 def get_closest_nodes_centered(i, N, count):
     indices = [i]
     d = 1
@@ -390,9 +382,6 @@ def create_dnm_connectivity(model_type, num_inputs, num_outputs, sparsity, num_d
     else: raise ValueError(f"Unknown model type: {model_type}")
     return mask.cpu().numpy()
 
-# -----------------------------------------------------------------------------
-# --- GRAPHING AND ANALYSIS FUNCTIONS ---
-# -----------------------------------------------------------------------------
 def create_network_graph(masks, layer_sizes):
     G = nx.DiGraph()
     node_offsets = np.cumsum([0] + layer_sizes)
@@ -431,64 +420,66 @@ def plot_network_graph(G, layer_sizes, ax):
 # -----------------------------------------------------------------------------
 st.title("Dendritic Network Model Visualization")
 
-# --- THIS IS THE SECTION TO BE MODIFIED ---
-st.sidebar.header("Network Architecture")
-# This is the old, incorrect logic
-# scale_factor = st.sidebar.select_slider(
-# 'Network Scale',
-# options=[0.25, 0.5, 1.0],
-# value=0.25,
-# format_func=lambda x: f'{int(x*100)}% (e.g., {int(784*x)}x{int(1568*x)})'
-# )
+
 base_layer_sizes = [784, 1568, 1568, 1568]
-layer_sizes = [int(s * 0.25) for s in base_layer_sizes]
-st.sidebar.write(f"**Current Dimensions:** `{layer_sizes[0]}` → `{layer_sizes[1]}` → `{layer_sizes[2]}` → `{layer_sizes[3]}`")
-# --- END OF SECTION TO BE MODIFIED ---
+# Define the fixed 25% scale for the MLP visualization
+viz_layer_sizes = [int(s * 0.25) for s in base_layer_sizes]
 
 
 # Sidebar parameters for the model
 st.sidebar.header("Model Configuration")
 model_type = st.sidebar.radio("Model Type", ["Local", "Original"], help="**Local**: Boundary-aware, non-wrapping connections. **Original**: Modulo-wrapping connections.")
 sparsity = st.sidebar.slider("Sparsity", 0.5, 0.99, 0.9, 0.01)
-num_dendrites = st.sidebar.slider("Avg. Dendrites (M)", 1, 20, 4)
-gamma = st.sidebar.slider("Avg. Receptive Field (Gamma)", 0.0, 1.0, 1.0, 0.05)
+num_dendrites = st.sidebar.slider("Avg. Dendrites (M)", 1, 11, 3, 2)
+gamma = st.sidebar.slider("Avg. Receptive Field (α)", 0.0, 1.0, 1.0, 0.05)
 st.sidebar.subheader("Parameter Distributions")
-dendrite_dist = st.sidebar.selectbox("Dendrite (M) Dist.", ["fixed", "gaussian", "uniform", "spatial_gaussian", "spatial_inversegaussian"])
+dendrite_dist = st.sidebar.selectbox("Dendritic Distribution", ["fixed", "gaussian", "uniform", "spatial_gaussian", "spatial_inversegaussian"])
 gamma_dist = st.sidebar.selectbox("Receptive Field Width Distribution", ["fixed", "gaussian", "uniform", "spatial_gaussian", "spatial_inversegaussian"])
 degree_dist = st.sidebar.selectbox("Degree Distribution", ["fixed", "uniform", "gaussian", "spatial_gaussian", "spatial_inversegaussian"])
 synaptic_dist = st.sidebar.selectbox("Synaptic Distribution", ["fixed", "uniform", "spatial_gaussian", "spatial_inversegaussian"])
 
 
 if st.button("Generate Network"):
-    with st.spinner("Creating network..."):
-        masks = []
-        for i in range(len(layer_sizes)-1):
+    # --- SIMULATION 1: FULL-SIZED NETWORK (100%) ---
+    with st.spinner("Creating full-size network for adjacency matrix..."):
+        full_masks = []
+        for i in range(len(base_layer_sizes)-1):
             conn_matrix = create_dnm_connectivity(
-                model_type=model_type, num_inputs=layer_sizes[i], num_outputs=layer_sizes[i+1],
+                model_type=model_type, num_inputs=base_layer_sizes[i], num_outputs=base_layer_sizes[i+1],
                 sparsity=sparsity, num_dendrites=num_dendrites, dendrite_dist=dendrite_dist,
                 gamma=gamma, gamma_dist=gamma_dist, synaptic_dist=synaptic_dist, degree_dist=degree_dist
             )
-            masks.append(conn_matrix)
+            full_masks.append(conn_matrix)
 
-    # 2. UPDATED: Simplified sparsity display
-    actual_sparsity = 1.0 - (np.sum(masks[0]) / masks[0].size)
-    st.info(f"**Generated Sparsity (Layer 0 -> 1):** `{actual_sparsity:.4f}`")
+    actual_sparsity = 1.0 - (np.sum(full_masks[0]) / full_masks[0].size)
+    st.info(f"**Full Network Sparsity (Layer 0 -> 1):** `{actual_sparsity:.4f}`")
 
-    # --- Plotting ---
-    st.subheader("Adjacency Matrix (Layer 0 -> 1)")
+    # Plot Adjacency Matrix from the full-sized network
+    st.subheader(f"Adjacency Matrix (Full Size: {base_layer_sizes[0]}x{base_layer_sizes[1]})")
     fig, ax = plt.subplots(figsize=(8, 4))
-    ax.imshow(masks[0], aspect='auto', cmap='Blues')
-    ax.set_xlabel(f"Output Neurons (Layer 1: {layer_sizes[1]})")
-    ax.set_ylabel(f"Input Neurons (Layer 0: {layer_sizes[0]})")
+    ax.imshow(full_masks[0], aspect='auto', cmap='Blues')
+    ax.set_xlabel(f"Output Neurons (Layer 1: {base_layer_sizes[1]})")
+    ax.set_ylabel(f"Input Neurons (Layer 0: {base_layer_sizes[0]})")
     st.pyplot(fig)
 
-    # 3. UPDATED: Visualize the full (but smaller) network directly
-    st.subheader("Full Network Visualization")
-    if sum(m.sum() for m in masks) > 0:
-        # We now pass the full 'masks' and 'layer_sizes'
-        G = create_network_graph(masks, layer_sizes)
+
+    # --- SIMULATION 2: SCALED-DOWN NETWORK (25%) ---
+    with st.spinner("Creating scaled-down network for MLP visualization..."):
+        viz_masks = []
+        for i in range(len(viz_layer_sizes)-1):
+            viz_conn_matrix = create_dnm_connectivity(
+                model_type=model_type, num_inputs=viz_layer_sizes[i], num_outputs=viz_layer_sizes[i+1],
+                sparsity=sparsity, num_dendrites=num_dendrites, dendrite_dist=dendrite_dist,
+                gamma=gamma, gamma_dist=gamma_dist, synaptic_dist=synaptic_dist, degree_dist=degree_dist
+            )
+            viz_masks.append(viz_conn_matrix)
+
+    # Plot the MLP graph from the scaled-down network
+    st.subheader(f"MLP Visualization (Scaled Down: {viz_layer_sizes[0]}x{viz_layer_sizes[1]})")
+    if sum(m.sum() for m in viz_masks) > 0:
+        G_viz = create_network_graph(viz_masks, viz_layer_sizes)
         fig_graph, ax_graph = plt.subplots(figsize=(8, 5))
-        plot_network_graph(G, layer_sizes, ax_graph)
+        plot_network_graph(G_viz, viz_layer_sizes, ax_graph)
         st.pyplot(fig_graph)
     else:
-        st.warning("No connections were generated to visualize.")
+        st.warning("No connections were generated in the scaled-down network to visualize.")
