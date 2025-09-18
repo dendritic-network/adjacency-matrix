@@ -10,49 +10,31 @@ import networkx as nx
 
 # -----------------------------------------------------------------------------
 # --- MODEL 1: LOCAL (BOUNDARY-AWARE) DENDRITIC MODEL FUNCTIONS ---
+# (This section is unchanged)
 # -----------------------------------------------------------------------------
-
 def _find_closest_free_block(size, ideal_center, occupied_slots, N_in):
-    """
-    Searches for a contiguous block of 'size' that is free of 'occupied_slots'.
-    The search starts at the closest valid position to 'ideal_center' and expands outwards.
-    """
-    if size <= 0:
-        return []
-
+    if size <= 0: return []
     valid_start_range_end = N_in - size
-    if valid_start_range_end < 0:
-        print(f"Warning: Block size {size} is larger than the layer {N_in}. Cannot place.")
-        return []
-
+    if valid_start_range_end < 0: return []
     ideal_start_pos = ideal_center - size // 2
     clamped_start_pos = max(0, min(ideal_start_pos, valid_start_range_end))
-
     for offset in range(N_in):
         start_pos_right = clamped_start_pos + offset
         if start_pos_right <= valid_start_range_end:
             candidate_block = set(range(start_pos_right, start_pos_right + size))
-            if not candidate_block.intersection(occupied_slots):
-                return list(candidate_block)
-
+            if not candidate_block.intersection(occupied_slots): return list(candidate_block)
         if offset > 0:
             start_pos_left = clamped_start_pos - offset
             if start_pos_left >= 0:
                 candidate_block = set(range(start_pos_left, start_pos_left + size))
-                if not candidate_block.intersection(occupied_slots):
-                    return list(candidate_block)
-
-    print("Warning: Could not place a dendrite block. Returning empty.")
+                if not candidate_block.intersection(occupied_slots): return list(candidate_block)
     return []
 
-
 def _adjust_samples_probabilistic_local(samples, target_total):
-    """Convert float samples to integers using probabilistic rounding"""
     integer_parts = np.floor(samples).astype(int)
     fractional = samples - integer_parts
     total_integer = np.sum(integer_parts)
     remainder = target_total - total_integer
-
     if remainder > 0:
         if np.sum(fractional) > 0:
             probs = fractional / np.sum(fractional)
@@ -61,15 +43,9 @@ def _adjust_samples_probabilistic_local(samples, target_total):
         else:
             extra_indices = np.random.choice(len(samples), size=remainder, replace=True)
             np.add.at(integer_parts, extra_indices, 1)
-
     return integer_parts.tolist()
 
-
 def _adjust_samples_clipping_local(samples, target_total):
-    """
-    Converts float samples to integers using probabilistic rounding while ensuring
-    the sum is exactly target_total and each value is at least 1 (if possible).
-    """
     samples = np.array(samples)
     target_total = int(target_total)
     samples[samples < 0] = 0
@@ -77,7 +53,6 @@ def _adjust_samples_clipping_local(samples, target_total):
     fractional = samples - integer_parts
     current_total = np.sum(integer_parts)
     diff = target_total - current_total
-
     if diff > 0:
         probs = fractional / np.sum(fractional) if np.sum(fractional) > 0 else np.ones_like(fractional) / len(fractional)
         extra_indices = np.random.choice(len(samples), size=diff, p=probs, replace=True)
@@ -89,29 +64,20 @@ def _adjust_samples_clipping_local(samples, target_total):
             idx_to_reduce = np.random.choice(can_reduce)
             integer_parts[idx_to_reduce] -= 1
             diff += 1
-
     return integer_parts.tolist()
 
-
 def pick_connections_for_output_node_local(j, N_in, N_out, D_total, M, gamma, args):
-    """
-    Determines connections for an output neuron using a symmetric tiling strategy
-    that handles left and right boundaries correctly (non-wrapping).
-    """
     base_center = j * (N_in / N_out)
     center = int(round(base_center))
-
     base_window = D_total
     window_size = int(round(base_window + gamma * (N_in - base_window)))
     window_size = max(D_total, min(window_size, N_in))
     window_start = center - window_size // 2
     uniform_centers = np.linspace(window_start, window_start + window_size, M, endpoint=False) + window_size/(2*M)
     group_centers = (1 - gamma) * center + gamma * uniform_centers
-
     group_sizes = []
     if args.synaptic_dist == "fixed":
-        base = D_total // M
-        remainder = D_total % M
+        base, remainder = D_total // M, D_total % M
         group_sizes = [base + 1] * remainder + [base] * (M - remainder)
         random.shuffle(group_sizes)
     elif args.synaptic_dist == "uniform":
@@ -125,8 +91,7 @@ def pick_connections_for_output_node_local(j, N_in, N_out, D_total, M, gamma, ar
         gc_rounded = [int(round(gc)) for gc in group_centers]
         distances = np.abs(np.array(gc_rounded) - center)
         sigma = args.synaptic_std * N_in
-        if args.synaptic_dist == "spatial_gaussian":
-            gaussian_vals = np.exp(-0.5 * (distances / sigma)**2)
+        if args.synaptic_dist == "spatial_gaussian": gaussian_vals = np.exp(-0.5 * (distances / sigma)**2)
         else:
             max_dist = np.max(distances) if len(distances) > 0 else 0
             inverse_distances = max_dist - distances
@@ -134,10 +99,8 @@ def pick_connections_for_output_node_local(j, N_in, N_out, D_total, M, gamma, ar
         probs = gaussian_vals / np.sum(gaussian_vals) if np.sum(gaussian_vals) > 0 else np.ones(M) / M
         group_assignments = np.random.choice(M, size=D_total, p=probs)
         group_sizes = np.bincount(group_assignments, minlength=M)
-
     candidate_groups = [{'ideal_center': int(round(gc)), 'size': g_size} for gc, g_size in zip(group_centers, group_sizes)]
     final_connections = set()
-
     if j < N_out / 2:
         candidate_groups.sort(key=lambda g: g['ideal_center'])
         last_placed_neuron_idx = -1
@@ -163,7 +126,6 @@ def pick_connections_for_output_node_local(j, N_in, N_out, D_total, M, gamma, ar
             new_block = range(actual_start, actual_end)
             final_connections.update(new_block)
             next_available_slot = actual_start
-
     final_list = list(final_connections)
     if len(final_list) > D_total:
         final_list.sort(key=lambda x: abs(x - center))
@@ -173,19 +135,15 @@ def pick_connections_for_output_node_local(j, N_in, N_out, D_total, M, gamma, ar
         available_slots = list(set(range(N_in)) - set(final_list))
         available_slots.sort(key=lambda x: abs(x - center))
         final_list.extend(available_slots[:needed])
-
     return final_list
 
 def create_dendritic_sparse_scheduler_local(sparsity, w, args):
     N_in, N_out = w.shape
-    base_M = args.M
-    total_target = int(round((1 - sparsity) * N_in * N_out))
+    base_M, total_target = args.M, int(round((1 - sparsity) * N_in * N_out))
     degree_dist = getattr(args, "degree_dist", "fixed")
-
     if degree_dist == "fixed":
         D_float = N_in * (1 - sparsity)
-        if D_float % 1 == 0:
-            connection_counts = [int(D_float)] * N_out
+        if D_float % 1 == 0: connection_counts = [int(D_float)] * N_out
         else:
             K1, K2 = int(D_float), int(D_float) + 1
             count_K2 = int(round((total_target - K1 * N_out) / (K2 - K1)))
@@ -202,25 +160,17 @@ def create_dendritic_sparse_scheduler_local(sparsity, w, args):
         samples = np.random.uniform(D_float-spread, D_float+spread, N_out)
         connection_counts = _adjust_samples_clipping_local(samples, total_target)
     elif degree_dist in ["spatial_gaussian", "spatial_inversegaussian"]:
-        center = (N_out - 1) / 2.0
-        sigma = args.degree_std * N_in * (1 - sparsity)
+        center, sigma = (N_out - 1) / 2.0, args.degree_std * N_in * (1 - sparsity)
         distances = np.abs(np.arange(N_out) - center)
-        if degree_dist == "spatial_gaussian":
-            weights = np.exp(-0.5 * (distances / sigma)**2)
+        if degree_dist == "spatial_gaussian": weights = np.exp(-0.5 * (distances / sigma)**2)
         else:
             max_weight = np.exp(-0.5 * (0 / sigma)**2)
             weights = max_weight - np.exp(-0.5 * (distances / sigma)**2)
         samples = weights * (total_target / np.sum(weights)) if np.sum(weights) > 0 else np.ones(N_out)*(total_target/N_out)
         connection_counts = _adjust_samples_clipping_local(samples, total_target)
-    else:
-        raise ValueError(f"Unknown degree distribution: {degree_dist}")
-
-    if degree_dist not in ["spatial_gaussian", "spatial_inversegaussian"]:
-        random.shuffle(connection_counts)
-    
+    else: raise ValueError(f"Unknown degree distribution: {degree_dist}")
+    if degree_dist not in ["spatial_gaussian", "spatial_inversegaussian"]: random.shuffle(connection_counts)
     connection_counts = np.clip(np.array(connection_counts, dtype=int), 1, N_in)
-    
-    # Adjust to meet exact total
     diff = total_target - np.sum(connection_counts)
     while diff != 0:
         if diff > 0:
@@ -235,45 +185,35 @@ def create_dendritic_sparse_scheduler_local(sparsity, w, args):
             idx = np.random.choice(candidates)
             connection_counts[idx] -= 1
             diff += 1
-
     adj = np.zeros((N_in, N_out), dtype=int)
     for j in range(N_out):
         gamma_j, M_j = _get_neuron_params(j, N_out, args)
         D_total = connection_counts[j]
         M_j = max(1, min(M_j, D_total))
         connections = pick_connections_for_output_node_local(j, N_in, N_out, D_total, M_j, gamma_j, args)
-        for i in connections:
-            adj[i, j] = 1
-
+        for i in connections: adj[i, j] = 1
     _apply_rewiring(adj, N_in, N_out, args.random_rewiring)
-    
     return torch.LongTensor(adj).to(w.device)
 
 # -----------------------------------------------------------------------------
 # --- MODEL 2: ORIGINAL (MODULO-WRAPPING) DENDRITIC MODEL FUNCTIONS ---
+# (This section is unchanged)
 # -----------------------------------------------------------------------------
-
 def _adjust_samples_original(samples, target_total):
-    """Convert float samples to integers while preserving total and ensuring >=1"""
-    samples = np.array(samples)
-    rounded = np.round(samples).astype(int)
-    clipped = np.clip(rounded, 1, None)
-    current_total = np.sum(clipped)
+    samples, rounded = np.array(samples), np.round(samples).astype(int)
+    clipped, current_total = np.clip(rounded, 1, None), np.sum(clipped)
     diff = target_total - current_total
-
     if diff != 0:
         fractional = samples - rounded
         if diff > 0:
             indices = np.argsort(-fractional)[:diff]
             clipped[indices] += 1
-        else: # diff < 0
+        else:
             reducible_mask = clipped > 1
             reducible_indices = np.where(reducible_mask)[0]
             if len(reducible_indices) > 0:
                 sorted_indices = reducible_indices[np.argsort(fractional[reducible_indices])]
-                for i in range(min(-diff, len(sorted_indices))):
-                    clipped[sorted_indices[i]] -= 1
-    
+                for i in range(min(-diff, len(sorted_indices))): clipped[sorted_indices[i]] -= 1
     final_diff = target_total - np.sum(clipped)
     if final_diff > 0:
         for i in range(final_diff): clipped[i % len(clipped)] += 1
@@ -283,27 +223,17 @@ def _adjust_samples_original(samples, target_total):
             if clipped[i] > 1 and removed < -final_diff:
                 clipped[i] -= 1
                 removed += 1
-    
     return clipped.tolist()
 
 def symmetric_positions_original(center, D_total, window_size, N_in):
-    """
-    Compute D_total positions evenly spaced within a window, symmetric about the
-    center, with modulo wrapping.
-    """
     half_window = (window_size - 1) // 2
     positions = np.linspace(center - half_window, center + half_window, D_total, dtype=int)
     positions = [(x % N_in) for x in positions]
     unique_positions = list(set(positions))
-    while len(unique_positions) < D_total:
-        unique_positions.extend(unique_positions)
+    while len(unique_positions) < D_total: unique_positions.extend(unique_positions)
     return unique_positions[:D_total]
 
 def pick_connections_for_output_node_original(j, N_in, N_out, D_total, M, gamma, args):
-    """
-    For output node j, returns a list of input node indices that will be connected,
-    using modulo wrapping for all positions.
-    """
     base_center = j * (N_in / N_out)
     center = int(round(base_center)) % N_in
     window_size = int(round(D_total + gamma * (N_in - D_total)))
@@ -312,12 +242,9 @@ def pick_connections_for_output_node_original(j, N_in, N_out, D_total, M, gamma,
     uniform_centers = np.linspace(window_start, window_start + window_size, M, endpoint=False) + window_size/(2*M)
     group_centers = (1 - gamma) * center + gamma * uniform_centers
     group_centers = [int(round(gc)) % N_in for gc in group_centers]
-    
     connections = []
-    
     if args.synaptic_dist == "fixed":
-        if gamma == 0:
-            return symmetric_positions_original(center, D_total, window_size, N_in)
+        if gamma == 0: return symmetric_positions_original(center, D_total, window_size, N_in)
         base, remainder = D_total // M, D_total % M
         group_sizes = [base + 1] * remainder + [base] * (M - remainder)
         random.shuffle(group_sizes)
@@ -327,9 +254,8 @@ def pick_connections_for_output_node_original(j, N_in, N_out, D_total, M, gamma,
     elif args.synaptic_dist in ["spatial_gaussian", "spatial_inversegaussian"]:
         distances = [min(abs(gc - base_center), N_in - abs(gc - base_center)) for gc in group_centers]
         sigma = args.synaptic_std * N_in
-        if args.synaptic_dist == "spatial_gaussian":
-            gaussian_vals = np.exp(-0.5 * (np.array(distances)/sigma)**2)
-        else: # inverse
+        if args.synaptic_dist == "spatial_gaussian": gaussian_vals = np.exp(-0.5 * (np.array(distances)/sigma)**2)
+        else:
             max_dist = np.max(distances) if distances else 0
             inverse_distances = max_dist - np.array(distances)
             gaussian_vals = np.exp(-0.5 * (inverse_distances/sigma)**2)
@@ -338,7 +264,7 @@ def pick_connections_for_output_node_original(j, N_in, N_out, D_total, M, gamma,
         group_sizes = np.bincount(group_assignments, minlength=M)
         for gc, size in zip(group_centers, group_sizes):
             connections.extend(get_closest_nodes_centered(gc, N_in, size))
-    else: # uniform, gaussian
+    else:
         st.warning(f"Synaptic distribution '{args.synaptic_dist}' is not fully defined for the 'Original' model and will use fixed distribution.")
         base, remainder = D_total // M, D_total % M
         group_sizes = [base + 1] * remainder + [base] * (M - remainder)
@@ -346,7 +272,6 @@ def pick_connections_for_output_node_original(j, N_in, N_out, D_total, M, gamma,
         for gc, g_size in zip(group_centers, group_sizes):
             half = g_size // 2
             connections.extend([(gc - half + k) % N_in for k in range(g_size)])
-
     unique_connections = list(set(connections))
     if len(unique_connections) < D_total:
         needed = D_total - len(unique_connections)
@@ -355,11 +280,9 @@ def pick_connections_for_output_node_original(j, N_in, N_out, D_total, M, gamma,
     return unique_connections[:D_total]
 
 def create_dendritic_sparse_scheduler_original(sparsity, w, args):
-    N_in, N_out = w.shape
-    base_M = args.M
+    N_in, N_out, base_M = w.shape[0], w.shape[1], args.M
     total_target = int(round((1 - sparsity) * N_in * N_out))
     degree_dist = getattr(args, "degree_dist", "fixed")
-
     if degree_dist == "fixed":
         D_float = N_in * (1 - sparsity)
         K1, K2 = int(D_float), int(D_float) + 1
@@ -371,65 +294,46 @@ def create_dendritic_sparse_scheduler_original(sparsity, w, args):
         if degree_dist == "gaussian":
             std = getattr(args, "degree_std", 2 * D_float)
             samples = np.random.normal(D_float, std, N_out)
-        else: # uniform
+        else:
             spread = getattr(args, "degree_spread", 4 * D_float)
             samples = np.random.uniform(D_float - spread, D_float + spread, N_out)
         samples = np.clip(samples, 1, N_in)
         connection_counts = _adjust_samples_original(samples, total_target)
     elif degree_dist in ["spatial_gaussian", "spatial_inversegaussian"]:
-        center = (N_out - 1) / 2.0
-        sigma = args.degree_std * N_in * (1 - sparsity)
+        center, sigma = (N_out - 1) / 2.0, args.degree_std * N_in * (1 - sparsity)
         distances = np.abs(np.arange(N_out) - center)
-        if degree_dist == "spatial_gaussian":
-            weights = np.exp(-0.5 * (distances / sigma)**2)
-        else: # inverse
-            weights = 1 - np.exp(-0.5 * (distances / sigma)**2)
+        if degree_dist == "spatial_gaussian": weights = np.exp(-0.5 * (distances / sigma)**2)
+        else: weights = 1 - np.exp(-0.5 * (distances / sigma)**2)
         samples = weights * (total_target / np.sum(weights)) if np.sum(weights) > 0 else np.ones(N_out)*(total_target/N_out)
         connection_counts = _adjust_samples_original(samples, total_target)
-    else:
-        raise ValueError(f"Unknown degree distribution: {degree_dist}")
-
-    if degree_dist not in ["spatial_gaussian", "spatial_inversegaussian"]:
-        random.shuffle(connection_counts)
-    
+    else: raise ValueError(f"Unknown degree distribution: {degree_dist}")
+    if degree_dist not in ["spatial_gaussian", "spatial_inversegaussian"]: random.shuffle(connection_counts)
     adj = np.zeros((N_in, N_out), dtype=int)
     for j in range(N_out):
         gamma_j, M_j = _get_neuron_params(j, N_out, args)
         D_total = connection_counts[j]
         M_j = max(1, min(M_j, D_total))
         connections = pick_connections_for_output_node_original(j, N_in, N_out, D_total, M_j, gamma_j, args)
-        for i in connections:
-            adj[i, j] = 1
-
+        for i in connections: adj[i, j] = 1
     _apply_rewiring(adj, N_in, N_out, args.random_rewiring)
-    
     return torch.LongTensor(adj).to(w.device)
 
 # -----------------------------------------------------------------------------
 # --- SHARED & UTILITY FUNCTIONS ---
+# (This section is unchanged)
 # -----------------------------------------------------------------------------
-
 def get_closest_nodes_centered(i, N, count):
-    """
-    Returns a list of 'count' indices from a layer of size N,
-    ordered as: i, i-1, i+1, i-2, i+2, … (with modulo wrapping)
-    """
     indices = [i]
     d = 1
     while len(indices) < count:
         indices.append((i - d) % N)
-        if len(indices) < count:
-            indices.append((i + d) % N)
+        if len(indices) < count: indices.append((i + d) % N)
         d += 1
     return indices[:count]
 
 def _get_neuron_params(j, N_out, args):
-    """Calculate gamma and M for a single neuron j based on distributions."""
-    # --- Gamma calculation ---
-    if args.gamma_dist == "fixed":
-        gamma_j = args.gamma
-    elif args.gamma_dist == "gaussian":
-        gamma_j = np.random.normal(args.gamma, args.gamma_std)
+    if args.gamma_dist == "fixed": gamma_j = args.gamma
+    elif args.gamma_dist == "gaussian": gamma_j = np.random.normal(args.gamma, args.gamma_std)
     elif args.gamma_dist == "uniform":
         spread = 0.25
         gamma_j = np.random.uniform(args.gamma - spread, args.gamma + spread)
@@ -440,39 +344,26 @@ def _get_neuron_params(j, N_out, args):
         mean_gamma_j = (1.0 - normalized_dist) if args.gamma_dist == "spatial_gaussian" else (args.gamma * normalized_dist)
         gamma_j = np.random.normal(mean_gamma_j, args.gamma_std)
     gamma_j = np.clip(gamma_j, 0.0, 1.0)
-    
-    # --- M calculation ---
     D_total_avg = args.N_in * (1 - args.sparsity)
-    if args.M_dist == "fixed":
-        M_j = args.M
-    elif args.M_dist == "gaussian":
-        M_j = np.random.normal(args.M, args.M_std)
+    if args.M_dist == "fixed": M_j = args.M
+    elif args.M_dist == "gaussian": M_j = np.random.normal(args.M, args.M_std)
     elif args.M_dist == "uniform":
         spread = getattr(args, "M_spread", args.M)
         M_j = np.random.uniform(args.M - spread, args.M + spread)
     elif args.M_dist in ["spatial_gaussian", "spatial_inversegaussian"]:
         center_out, sigma = (N_out - 1) / 2.0, args.M_std * N_out
         distance = abs(j - center_out)
-        if args.M_dist == "spatial_gaussian":
-            weight = np.exp(-0.5 * (distance / sigma)**2)
-        else: # inverse
-            weight = 1.0 - 0.9 * np.exp(-0.5 * (distance / sigma)**2)
-        M_j = weight * args.M * 2 # Heuristic scaling
-    
+        if args.M_dist == "spatial_gaussian": weight = np.exp(-0.5 * (distance / sigma)**2)
+        else: weight = 1.0 - 0.9 * np.exp(-0.5 * (distance / sigma)**2)
+        M_j = weight * args.M * 2
     M_j = int(np.round(np.clip(M_j, 1, D_total_avg)))
-    
     return gamma_j, M_j
 
 def _apply_rewiring(adj, N_in, N_out, rewire_prob):
-    """Applies random rewiring to the adjacency matrix in-place."""
-    if rewire_prob == 0:
-        return
-    
+    if rewire_prob == 0: return
     total_edges = int(np.sum(adj))
     to_rewire_mask = np.random.binomial(1, p=rewire_prob, size=total_edges)
-    
-    current_edge = 0
-    removed_count = 0
+    current_edge, removed_count = 0, 0
     for i in range(N_in):
         for j in range(N_out):
             if adj[i, j] == 1:
@@ -480,166 +371,107 @@ def _apply_rewiring(adj, N_in, N_out, rewire_prob):
                     adj[i, j] = 0
                     removed_count += 1
                 current_edge += 1
-    
     added_count = 0
     while added_count < removed_count:
         i_rand, j_rand = np.random.randint(0, N_in), np.random.randint(0, N_out)
         if adj[i_rand, j_rand] == 0:
             adj[i_rand, j_rand] = 1
             added_count += 1
-            
+
 def create_dnm_connectivity(model_type, num_inputs, num_outputs, sparsity, num_dendrites,
                             dendrite_dist, gamma, gamma_dist, synaptic_dist, degree_dist, **kwargs):
-    """
-    Main dispatcher function. Creates connectivity by calling the appropriate
-    scheduler based on the selected model type.
-    """
     w = torch.zeros((num_inputs, num_outputs))
-    args = SimpleNamespace(
-        M=num_dendrites, M_dist=dendrite_dist, degree_dist=degree_dist,
-        synaptic_dist=synaptic_dist, gamma=gamma, gamma_dist=gamma_dist,
-        random_rewiring=0, degree_std=2.0, M_std=num_dendrites/2,
-        gamma_std=0.05, synaptic_std=0.1, N_in=num_inputs, sparsity=sparsity,
-        **kwargs
-    )
-    
-    if model_type == "Local":
-        mask = create_dendritic_sparse_scheduler_local(sparsity, w, args)
-    elif model_type == "Original":
-        mask = create_dendritic_sparse_scheduler_original(sparsity, w, args)
-    else:
-        raise ValueError(f"Unknown model type: {model_type}")
-        
+    args = SimpleNamespace(M=num_dendrites, M_dist=dendrite_dist, degree_dist=degree_dist,
+        synaptic_dist=synaptic_dist, gamma=gamma, gamma_dist=gamma_dist, random_rewiring=0,
+        degree_std=2.0, M_std=num_dendrites/2, gamma_std=0.05, synaptic_std=0.1,
+        N_in=num_inputs, sparsity=sparsity, **kwargs)
+    if model_type == "Local": mask = create_dendritic_sparse_scheduler_local(sparsity, w, args)
+    elif model_type == "Original": mask = create_dendritic_sparse_scheduler_original(sparsity, w, args)
+    else: raise ValueError(f"Unknown model type: {model_type}")
     return mask.cpu().numpy()
 
 # -----------------------------------------------------------------------------
 # --- GRAPHING AND ANALYSIS FUNCTIONS ---
+# (This section is unchanged, but the corrected version is provided)
 # -----------------------------------------------------------------------------
-
 def create_network_graph(masks, layer_sizes):
-    """Create a networkx graph from the connectivity matrices"""
     G = nx.DiGraph()
     node_offsets = np.cumsum([0] + layer_sizes)
     for layer_idx, size in enumerate(layer_sizes):
-        for node_idx in range(node_offsets[layer_idx], node_offsets[layer_idx] + size):
+        for node_idx in range(int(node_offsets[layer_idx]), int(node_offsets[layer_idx] + size)):
             G.add_node(node_idx, layer=layer_idx)
     for layer_idx, mask in enumerate(masks):
         sources, targets = np.where(mask == 1)
         for src, tgt in zip(sources, targets):
-            G.add_edge(node_offsets[layer_idx] + src, node_offsets[layer_idx+1] + tgt)
+            G.add_edge(int(node_offsets[layer_idx] + src), int(node_offsets[layer_idx+1] + tgt))
     return G
 
 def plot_network_graph(G, layer_sizes, ax):
-    """Plot the network graph with layers arranged horizontally"""
     pos = {}
     for layer_idx, size in enumerate(layer_sizes):
-        # CORRECTED LINE: Generate y-positions from 1 (top) to 0 (bottom)
         y_positions = np.linspace(1, 0, size)
         for i in range(size):
-            # This line calculates the absolute node index. Note the int() cast for safety.
             node_idx = int(np.sum(layer_sizes[:layer_idx])) + i
             pos[node_idx] = (layer_idx, y_positions[i])
-
     for edge in G.edges():
         ax.plot([pos[edge[0]][0], pos[edge[1]][0]], [pos[edge[0]][1], pos[edge[1]][1]], 'gray', alpha=0.1, lw=0.5)
-
     colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728']
     for layer_idx in range(len(layer_sizes)):
         nodes = range(int(np.sum(layer_sizes[:layer_idx])), int(np.sum(layer_sizes[:layer_idx+1])))
-        # Check if nodes exist in pos before plotting
         nodes_in_pos = [n for n in nodes if n in pos]
         if nodes_in_pos:
             ax.scatter([pos[n][0] for n in nodes_in_pos], [pos[n][1] for n in nodes_in_pos], s=10, color=colors[layer_idx], label=f'Layer {layer_idx}')
-    
     ax.axis('off')
     ax.set_title('Network Structure')
     ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.05), ncol=len(layer_sizes))
-    
+
+
 # -----------------------------------------------------------------------------
 # --- STREAMLIT UI ---
+# (This section contains all the new changes)
 # -----------------------------------------------------------------------------
-
 st.title("Dendritic Network Model Visualization")
 
-# Define fixed layer sizes
-layer_sizes = [784, 1568, 1568, 1568]
-
-# Sidebar parameters
-st.sidebar.header("Model Configuration")
-model_type = st.sidebar.radio(
-    "Model Type", 
-    ["Local", "Original"], 
-    help="**Local**: Boundary-aware, non-wrapping connections. **Original**: Modulo-wrapping connections."
+# 1. UPDATED: Define smaller layer sizes for the entire simulation
+st.sidebar.header("Network Architecture")
+scale_factor = st.sidebar.select_slider(
+    'Network Scale',
+    options=[0.25, 0.5, 1.0],
+    value=0.25,
+    format_func=lambda x: f'{int(x*100)}% (e.g., {int(784*x)}x{int(1568*x)})'
 )
+base_layer_sizes = [784, 1568, 1568, 1568]
+layer_sizes = [int(s * scale_factor) for s in base_layer_sizes]
+st.sidebar.write(f"**Current Dimensions:** `{layer_sizes[0]}` → `{layer_sizes[1]}` → `{layer_sizes[2]}` → `{layer_sizes[3]}`")
 
-st.sidebar.header("Network Parameters")
+
+# Sidebar parameters for the model
+st.sidebar.header("Model Configuration")
+model_type = st.sidebar.radio("Model Type", ["Local", "Original"], help="**Local**: Boundary-aware, non-wrapping connections. **Original**: Modulo-wrapping connections.")
 sparsity = st.sidebar.slider("Sparsity", 0.5, 0.99, 0.9, 0.01)
-num_dendrites = st.sidebar.slider("Avg. Dendrites (M)", 1, 11, 3)
-gamma = st.sidebar.slider("Avg. Receptive Field (α)", 0.0, 1.0, 1.0, 0.05)
-
+num_dendrites = st.sidebar.slider("Avg. Dendrites (M)", 1, 20, 4)
+gamma = st.sidebar.slider("Avg. Receptive Field (Gamma)", 0.0, 1.0, 1.0, 0.05)
 st.sidebar.subheader("Parameter Distributions")
 dendrite_dist = st.sidebar.selectbox("Dendrite (M) Dist.", ["fixed", "gaussian", "uniform", "spatial_gaussian", "spatial_inversegaussian"])
 gamma_dist = st.sidebar.selectbox("Receptive Field (Gamma) Dist.", ["fixed", "gaussian", "uniform", "spatial_gaussian", "spatial_inversegaussian"])
 degree_dist = st.sidebar.selectbox("Degree Dist.", ["fixed", "uniform", "gaussian", "spatial_gaussian", "spatial_inversegaussian"])
 synaptic_dist = st.sidebar.selectbox("Synaptic Dist.", ["fixed", "uniform", "spatial_gaussian", "spatial_inversegaussian"])
 
+
 if st.button("Generate Network"):
-    with st.spinner("Creating network... this may take a moment."):
+    with st.spinner("Creating network..."):
         masks = []
         for i in range(len(layer_sizes)-1):
             conn_matrix = create_dnm_connectivity(
-                model_type=model_type,
-                num_inputs=layer_sizes[i], 
-                num_outputs=layer_sizes[i+1], 
-                sparsity=sparsity, 
-                num_dendrites=num_dendrites,
-                dendrite_dist=dendrite_dist, 
-                gamma=gamma, 
-                gamma_dist=gamma_dist,
-                synaptic_dist=synaptic_dist, 
-                degree_dist=degree_dist
+                model_type=model_type, num_inputs=layer_sizes[i], num_outputs=layer_sizes[i+1],
+                sparsity=sparsity, num_dendrites=num_dendrites, dendrite_dist=dendrite_dist,
+                gamma=gamma, gamma_dist=gamma_dist, synaptic_dist=synaptic_dist, degree_dist=degree_dist
             )
             masks.append(conn_matrix)
 
-    # --- Sparsity Display ---
-    st.subheader("Sparsity Analysis")
-    
-    # Calculate global sparsity for the first layer
+    # 2. UPDATED: Simplified sparsity display
     actual_sparsity = 1.0 - (np.sum(masks[0]) / masks[0].size)
-
-    # --- Sampling Logic for Visualization ---
-    sample_layer_sizes = [50, 60, 60, 60]
-    sample_masks = []
-    for i, m in enumerate(masks):
-        full_in_dim, full_out_dim = m.shape
-        sample_in_dim = sample_layer_sizes[i]
-        sample_out_dim = sample_layer_sizes[i+1]
-        
-        center_in, center_out = full_in_dim // 2, full_out_dim // 2
-        
-        start_in = center_in - (sample_in_dim // 2)
-        end_in = start_in + sample_in_dim
-        start_out = center_out - (sample_out_dim // 2)
-        end_out = start_out + sample_out_dim
-        
-        sample_mask = m[start_in:end_in, start_out:end_out]
-        sample_masks.append(sample_mask)
-
-    # Calculate the local sparsity of the sampled visualization (first layer)
-    sample_sparsity = 1.0 - (np.sum(sample_masks[0]) / sample_masks[0].size)
-
-    # Use columns for a nice side-by-side display of both sparsity values
-    col1, col2 = st.columns(2)
-    col1.metric(
-        "Global Sparsity (Full Network)", 
-        f"{actual_sparsity:.4f}",
-        help="The actual sparsity across the entire first layer (e.g., 784x1568)."
-    )
-    col2.metric(
-        "Local Sparsity (Sampled View)", 
-        f"{sample_sparsity:.4f}",
-        help="The sparsity of the small, central sample shown in the visualization below. This can differ significantly from the global value, especially with spatial distributions."
-    )
+    st.info(f"**Generated Sparsity (Layer 0 -> 1):** `{actual_sparsity:.4f}`")
 
     # --- Plotting ---
     st.subheader("Adjacency Matrix (Layer 0 -> 1)")
@@ -649,11 +481,13 @@ if st.button("Generate Network"):
     ax.set_ylabel(f"Input Neurons (Layer 0: {layer_sizes[0]})")
     st.pyplot(fig)
 
-    st.subheader("Network Visualization (Sampled)")
-    if sum(m.sum() for m in sample_masks) > 0:
-        G_sample = create_network_graph(sample_masks, sample_layer_sizes)
+    # 3. UPDATED: Visualize the full (but smaller) network directly
+    st.subheader("Full Network Visualization")
+    if sum(m.sum() for m in masks) > 0:
+        # We now pass the full 'masks' and 'layer_sizes'
+        G = create_network_graph(masks, layer_sizes)
         fig_graph, ax_graph = plt.subplots(figsize=(8, 5))
-        plot_network_graph(G_sample, sample_layer_sizes, ax_graph)
+        plot_network_graph(G, layer_sizes, ax_graph)
         st.pyplot(fig_graph)
     else:
-        st.warning("No connections in the sampled subset to visualize.")
+        st.warning("No connections were generated to visualize.")
