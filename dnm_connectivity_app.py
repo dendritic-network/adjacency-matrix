@@ -589,8 +589,8 @@ model_type = st.sidebar.radio(
 
 st.sidebar.header("Network Parameters")
 sparsity = st.sidebar.slider("Sparsity", 0.5, 0.99, 0.9, 0.01)
-num_dendrites = st.sidebar.slider("Avg. Dendrites (M)", 1, 20, 4)
-gamma = st.sidebar.slider("Avg. Receptive Field (Gamma)", 0.0, 1.0, 1.0, 0.05)
+num_dendrites = st.sidebar.slider("Avg. Dendrites (M)", 1, 11, 3)
+gamma = st.sidebar.slider("Avg. Receptive Field (α)", 0.0, 1.0, 1.0, 0.05)
 
 st.sidebar.subheader("Parameter Distributions")
 dendrite_dist = st.sidebar.selectbox("Dendrite (M) Dist.", ["fixed", "gaussian", "uniform", "spatial_gaussian", "spatial_inversegaussian"])
@@ -617,7 +617,7 @@ if st.button("Generate Network"):
             masks.append(conn_matrix)
 
         actual_sparsity = 1.0 - (np.sum(masks[0]) / masks[0].size)
-        st.info(f"**Generated Sparsity (Layer 0 -> 1):** `{actual_sparsity:.6f}`")
+        st.info(f"**Generated Sparsity (Layer 0 -> 1): {actual_sparsity:.6f}**")
         
         # Plotting
         st.subheader("Adjacency Matrix (Layer 0 -> 1)")
