@@ -432,17 +432,9 @@ def plot_network_graph(G, layer_sizes, ax):
 # -----------------------------------------------------------------------------
 st.title("Dendritic Network Model Visualization")
 
-# 1. UPDATED: Define smaller layer sizes for the entire simulation
-st.sidebar.header("Network Architecture")
-scale_factor = st.sidebar.select_slider(
-    'Network Scale',
-    options=[0.25, 0.5, 1.0],
-    value=0.25,
-    format_func=lambda x: f'{int(x*100)}% (e.g., {int(784*x)}x{int(1568*x)})'
-)
+
 base_layer_sizes = [784, 1568, 1568, 1568]
-layer_sizes = [int(s * scale_factor) for s in base_layer_sizes]
-st.sidebar.write(f"**Current Dimensions:** `{layer_sizes[0]}` → `{layer_sizes[1]}` → `{layer_sizes[2]}` → `{layer_sizes[3]}`")
+layer_sizes = [int(s * 0.25) for s in base_layer_sizes]
 
 
 # Sidebar parameters for the model
@@ -452,10 +444,10 @@ sparsity = st.sidebar.slider("Sparsity", 0.5, 0.99, 0.9, 0.01)
 num_dendrites = st.sidebar.slider("Avg. Dendrites (M)", 1, 20, 4)
 gamma = st.sidebar.slider("Avg. Receptive Field (Gamma)", 0.0, 1.0, 1.0, 0.05)
 st.sidebar.subheader("Parameter Distributions")
-dendrite_dist = st.sidebar.selectbox("Dendrite (M) Dist.", ["fixed", "gaussian", "uniform", "spatial_gaussian", "spatial_inversegaussian"])
-gamma_dist = st.sidebar.selectbox("Receptive Field (Gamma) Dist.", ["fixed", "gaussian", "uniform", "spatial_gaussian", "spatial_inversegaussian"])
-degree_dist = st.sidebar.selectbox("Degree Dist.", ["fixed", "uniform", "gaussian", "spatial_gaussian", "spatial_inversegaussian"])
-synaptic_dist = st.sidebar.selectbox("Synaptic Dist.", ["fixed", "uniform", "spatial_gaussian", "spatial_inversegaussian"])
+dendrite_dist = st.sidebar.selectbox("Dendritic Distribution", ["fixed", "gaussian", "uniform", "spatial_gaussian", "spatial_inversegaussian"])
+gamma_dist = st.sidebar.selectbox("Receptive Field Width Distribution", ["fixed", "gaussian", "uniform", "spatial_gaussian", "spatial_inversegaussian"])
+degree_dist = st.sidebar.selectbox("Degree Distribution", ["fixed", "uniform", "gaussian", "spatial_gaussian", "spatial_inversegaussian"])
+synaptic_dist = st.sidebar.selectbox("Synaptic Distribution", ["fixed", "uniform", "spatial_gaussian", "spatial_inversegaussian"])
 
 
 if st.button("Generate Network"):
