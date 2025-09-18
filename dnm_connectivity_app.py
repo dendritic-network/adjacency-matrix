@@ -622,7 +622,7 @@ if st.button("Generate Network"):
         # Plotting
         st.subheader("Adjacency Matrix (Layer 0 -> 1)")
         fig, ax = plt.subplots(figsize=(8, 4))
-        ax.imshow(masks[0], aspect='auto', cmap='viridis')
+        ax.imshow(masks[0], aspect='auto', cmap='Blues')
         ax.set_xlabel(f"Output Neurons (Layer 1: {layer_sizes[1]})")
         ax.set_ylabel(f"Input Neurons (Layer 0: {layer_sizes[0]})")
         st.pyplot(fig)
