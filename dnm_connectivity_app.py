@@ -601,32 +601,21 @@ if st.button("Generate Network"):
             )
             masks.append(conn_matrix)
 
-    # --- ALL THE CODE BELOW IS NOW CORRECTLY INDENTED ---
-
-    actual_sparsity = 1.0 - (np.sum(masks[0]) / masks[0].size)
-    st.info(f"**Generated Sparsity (Layer 0 -> 1):** `{actual_sparsity:.6f}`")
+    # --- Sparsity Display ---
+    st.subheader("Sparsity Analysis")
     
-    # Plotting Adjacency Matrix
-    st.subheader("Adjacency Matrix (Layer 0 -> 1)")
-    fig, ax = plt.subplots(figsize=(8, 4))
-    ax.imshow(masks[0], aspect='auto', cmap='Blues')
-    ax.set_xlabel(f"Output Neurons (Layer 1: {layer_sizes[1]})")
-    ax.set_ylabel(f"Input Neurons (Layer 0: {layer_sizes[0]})")
-    st.pyplot(fig)
+    # Calculate global sparsity for the first layer
+    actual_sparsity = 1.0 - (np.sum(masks[0]) / masks[0].size)
 
-    # Plotting Network Visualization
-    st.subheader("Network Visualization (Sampled)")
+    # --- Sampling Logic for Visualization ---
     sample_layer_sizes = [50, 60, 60, 60]
     sample_masks = []
-    
-    # This loop now runs correctly after 'masks' is created
     for i, m in enumerate(masks):
         full_in_dim, full_out_dim = m.shape
         sample_in_dim = sample_layer_sizes[i]
         sample_out_dim = sample_layer_sizes[i+1]
         
-        center_in = full_in_dim // 2
-        center_out = full_out_dim // 2
+        center_in, center_out = full_in_dim // 2, full_out_dim // 2
         
         start_in = center_in - (sample_in_dim // 2)
         end_in = start_in + sample_in_dim
@@ -635,7 +624,32 @@ if st.button("Generate Network"):
         
         sample_mask = m[start_in:end_in, start_out:end_out]
         sample_masks.append(sample_mask)
-    
+
+    # Calculate the local sparsity of the sampled visualization (first layer)
+    sample_sparsity = 1.0 - (np.sum(sample_masks[0]) / sample_masks[0].size)
+
+    # Use columns for a nice side-by-side display of both sparsity values
+    col1, col2 = st.columns(2)
+    col1.metric(
+        "Global Sparsity (Full Network)", 
+        f"{actual_sparsity:.4f}",
+        help="The actual sparsity across the entire first layer (e.g., 784x1568)."
+    )
+    col2.metric(
+        "Local Sparsity (Sampled View)", 
+        f"{sample_sparsity:.4f}",
+        help="The sparsity of the small, central sample shown in the visualization below. This can differ significantly from the global value, especially with spatial distributions."
+    )
+
+    # --- Plotting ---
+    st.subheader("Adjacency Matrix (Layer 0 -> 1)")
+    fig, ax = plt.subplots(figsize=(8, 4))
+    ax.imshow(masks[0], aspect='auto', cmap='Blues')
+    ax.set_xlabel(f"Output Neurons (Layer 1: {layer_sizes[1]})")
+    ax.set_ylabel(f"Input Neurons (Layer 0: {layer_sizes[0]})")
+    st.pyplot(fig)
+
+    st.subheader("Network Visualization (Sampled)")
     if sum(m.sum() for m in sample_masks) > 0:
         G_sample = create_network_graph(sample_masks, sample_layer_sizes)
         fig_graph, ax_graph = plt.subplots(figsize=(8, 5))
