@@ -628,12 +628,12 @@ if st.button("Generate Network"):
         st.pyplot(fig)
 
         st.subheader("Network Visualization (Sampled)")
-        # For visualization, let's use smaller, sampled layer sizes to make it plottable
         sample_layer_sizes = [50, 60, 60, 60]
         sample_masks = []
-        for m in masks:
-            # Simple sampling of the big matrix for visualization purposes
-            sample_mask = m[:sample_layer_sizes[0], :sample_layer_sizes[1]]
+        # Use enumerate to get the layer index 'i'
+        for i, m in enumerate(masks):
+            # Use the correct, dynamic indices [i] and [i+1] for slicing
+            sample_mask = m[:sample_layer_sizes[i], :sample_layer_sizes[i+1]]
             sample_masks.append(sample_mask)
         
         if sum(m.sum() for m in sample_masks) > 0:
