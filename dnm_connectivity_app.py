@@ -612,19 +612,39 @@ if st.button("Generate Network"):
         ax.set_ylabel(f"Input Neurons (Layer 0: {layer_sizes[0]})")
         st.pyplot(fig)
 
-        st.subheader("Network Visualization (Sampled)")
-        sample_layer_sizes = [50, 60, 60, 60]
-        sample_masks = []
-        # Use enumerate to get the layer index 'i'
-        for i, m in enumerate(masks):
-            # Use the correct, dynamic indices [i] and [i+1] for slicing
-            sample_mask = m[:sample_layer_sizes[i], :sample_layer_sizes[i+1]]
-            sample_masks.append(sample_mask)
-        
-        if sum(m.sum() for m in sample_masks) > 0:
-            G_sample = create_network_graph(sample_masks, sample_layer_sizes[:len(sample_masks)+1])
-            fig_graph, ax_graph = plt.subplots(figsize=(8, 5))
-            plot_network_graph(G_sample, sample_layer_sizes[:len(sample_masks)+1], ax_graph)
-            st.pyplot(fig_graph)
-        else:
-            st.warning("No connections in the sampled subset to visualize.")
+st.subheader("Network Visualization (Sampled)")
+# For visualization, let's use smaller, sampled layer sizes to make it plottable
+sample_layer_sizes = [50, 60, 60, 60]
+sample_masks = []
+# CORRECTED SAMPLING LOGIC
+for i, m in enumerate(masks):
+    # Get full matrix dimensions
+    full_in_dim, full_out_dim = m.shape
+    
+    # Get sample dimensions for this connection
+    sample_in_dim = sample_layer_sizes[i]
+    sample_out_dim = sample_layer_sizes[i+1]
+    
+    # Calculate the center of the full matrix
+    center_in = full_in_dim // 2
+    center_out = full_out_dim // 2
+    
+    # Calculate start and end indices for a center slice
+    start_in = center_in - (sample_in_dim // 2)
+    end_in = start_in + sample_in_dim
+    start_out = center_out - (sample_out_dim // 2)
+    end_out = start_out + sample_out_dim
+    
+    # Take the center slice
+    sample_mask = m[start_in:end_in, start_out:end_out]
+    sample_masks.append(sample_mask)
+
+if sum(m.sum() for m in sample_masks) > 0:
+    # The create_network_graph function no longer needs a sliced layer_sizes
+    G_sample = create_network_graph(sample_masks, sample_layer_sizes)
+    fig_graph, ax_graph = plt.subplots(figsize=(8, 5))
+    plot_network_graph(G_sample, sample_layer_sizes, ax_graph)
+    st.pyplot(fig_graph)
+else:
+    st.warning("No connections in the sampled subset to visualize.")
+
