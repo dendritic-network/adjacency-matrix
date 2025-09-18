@@ -433,7 +433,7 @@ viz_layer_sizes = [int(s * 0.25) for s in base_layer_sizes]
 
 # Sidebar parameters for the model
 st.sidebar.header("Model Configuration")
-model_type = st.sidebar.radio("Model Type", ["Local", "Original"], help="**Local**: Boundary-aware, non-wrapping connections. **Original**: Modulo-wrapping connections.")
+model_type = st.sidebar.radio("Model Type", ["Original", "Local"], help="**Local**: Boundary-aware, non-wrapping connections. **Original**: Modulo-wrapping connections.")
 sparsity = st.sidebar.slider("Sparsity", 0.5, 0.99, 0.9, 0.01)
 num_dendrites = st.sidebar.slider("Avg. Dendrites (M)", 1, 11, 3, 2)
 gamma = st.sidebar.slider("Avg. Receptive Field (α)", 0.0, 1.0, 1.0, 0.05)
