@@ -543,7 +543,7 @@ def plot_network_graph(G, layer_sizes, ax):
 
     colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728']
     for layer_idx in range(len(layer_sizes)):
-        nodes = range(np.sum(layer_sizes[:layer_idx]), np.sum(layer_sizes[:layer_idx+1]))
+        nodes = range(int(np.sum(layer_sizes[:layer_idx])), int(np.sum(layer_sizes[:layer_idx+1])))
         ax.scatter([pos[n][0] for n in nodes], [pos[n][1] for n in nodes], s=10, color=colors[layer_idx], label=f'Layer {layer_idx}')
     
     ax.axis('off')
