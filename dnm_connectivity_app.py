@@ -425,13 +425,11 @@ def plot_network_graph(G, layer_sizes, ax):
 # -----------------------------------------------------------------------------
 st.title("Dendritic Network Model Visualization")
 
-
 base_layer_sizes = [784, 1568, 1568, 1568]
 # Define the fixed 25% scale for the MLP visualization
 viz_layer_sizes = [int(s * 0.25) for s in base_layer_sizes]
 
-
-# Sidebar parameters for the model
+# --- Sidebar parameters for the model ---
 st.sidebar.header("Model Configuration")
 model_type = st.sidebar.radio("Model Type", ["Original", "Local"], help="**Local**: Boundary-aware, non-wrapping connections. **Original**: Modulo-wrapping connections.")
 sparsity = st.sidebar.slider("Sparsity", 0.5, 0.99, 0.9, 0.01)
@@ -443,7 +441,13 @@ gamma_dist = st.sidebar.selectbox("Receptive Field Width Distribution", ["fixed"
 degree_dist = st.sidebar.selectbox("Degree Distribution", ["fixed", "uniform", "gaussian", "spatial_gaussian", "spatial_inversegaussian"])
 synaptic_dist = st.sidebar.selectbox("Synaptic Distribution", ["fixed", "uniform", "spatial_gaussian", "spatial_inversegaussian"])
 
+st.sidebar.subheader("Additional Visualizations")
+# --- NEW: Checkbox to control MLP visualization ---
+show_mlp_viz = st.sidebar.checkbox("Show Scaled-Down MLP Visualization")
+if show_mlp_viz:
+    st.sidebar.warning("⚠️ Enabling the MLP visualization runs a second, separate simulation and may take a few moments to generate.")
 
+# --- Main app logic ---
 if st.button("Generate Network"):
     # --- SIMULATION 1: FULL-SIZED NETWORK (100%) ---
     with st.spinner("Creating full-size network for adjacency matrix..."):
@@ -467,24 +471,26 @@ if st.button("Generate Network"):
     ax.set_ylabel(f"Input Neurons (Layer 0: {base_layer_sizes[0]})")
     st.pyplot(fig)
 
+    # --- NEW: Conditional execution of SIMULATION 2 ---
+    if show_mlp_viz:
+        # --- SIMULATION 2: SCALED-DOWN NETWORK (25%) ---
+        with st.spinner("Creating scaled-down network for MLP visualization..."):
+            viz_masks = []
+            for i in range(len(viz_layer_sizes)-1):
+                viz_conn_matrix = create_dnm_connectivity(
+                    model_type=model_type, num_inputs=viz_layer_sizes[i], num_outputs=viz_layer_sizes[i+1],
+                    sparsity=sparsity, num_dendrites=num_dendrites, dendrite_dist=dendrite_dist,
+                    gamma=gamma, gamma_dist=gamma_dist, synaptic_dist=synaptic_dist, degree_dist=degree_dist
+                )
+                viz_masks.append(viz_conn_matrix)
 
-    # --- SIMULATION 2: SCALED-DOWN NETWORK (25%) ---
-    with st.spinner("Creating scaled-down network for MLP visualization..."):
-        viz_masks = []
-        for i in range(len(viz_layer_sizes)-1):
-            viz_conn_matrix = create_dnm_connectivity(
-                model_type=model_type, num_inputs=viz_layer_sizes[i], num_outputs=viz_layer_sizes[i+1],
-                sparsity=sparsity, num_dendrites=num_dendrites, dendrite_dist=dendrite_dist,
-                gamma=gamma, gamma_dist=gamma_dist, synaptic_dist=synaptic_dist, degree_dist=degree_dist
-            )
-            viz_masks.append(viz_conn_matrix)
+        # Plot the MLP graph from the scaled-down network
+        st.subheader(f"MLP Visualization (Scaled Down: {viz_layer_sizes[0]}x{viz_layer_sizes[1]})")
+        if sum(m.sum() for m in viz_masks) > 0:
+            G_viz = create_network_graph(viz_masks, viz_layer_sizes)
+            fig_graph, ax_graph = plt.subplots(figsize=(8, 5))
+            plot_network_graph(G_viz, viz_layer_sizes, ax_graph)
+            st.pyplot(fig_graph)
+        else:
+            st.warning("No connections were generated in the scaled-down network to visualize.")
 
-    # Plot the MLP graph from the scaled-down network
-    st.subheader(f"MLP Visualization (Scaled Down: {viz_layer_sizes[0]}x{viz_layer_sizes[1]})")
-    if sum(m.sum() for m in viz_masks) > 0:
-        G_viz = create_network_graph(viz_masks, viz_layer_sizes)
-        fig_graph, ax_graph = plt.subplots(figsize=(8, 5))
-        plot_network_graph(G_viz, viz_layer_sizes, ax_graph)
-        st.pyplot(fig_graph)
-    else:
-        st.warning("No connections were generated in the scaled-down network to visualize.")
