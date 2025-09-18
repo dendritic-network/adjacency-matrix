@@ -197,7 +197,12 @@ def create_dendritic_sparse_scheduler_local(sparsity, w, args):
 
 def _adjust_samples_original(samples, target_total):
     samples, rounded = np.array(samples), np.round(samples).astype(int)
-    clipped, current_total = np.clip(rounded, 1, None), np.sum(clipped)
+    
+    # --- CORRECTED CODE ---
+    clipped = np.clip(rounded, 1, None)
+    current_total = np.sum(clipped)
+    # --- END CORRECTION ---
+
     diff = target_total - current_total
     if diff != 0:
         fractional = samples - rounded
