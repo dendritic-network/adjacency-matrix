@@ -382,8 +382,8 @@ def create_dnm_connectivity(model_type, num_inputs, num_outputs, sparsity, num_d
         synaptic_dist=synaptic_dist, gamma=gamma, gamma_dist=gamma_dist, random_rewiring=0,
         degree_std=2.0, M_std=num_dendrites/2, gamma_std=0.05, synaptic_std=0.1,
         N_in=num_inputs, sparsity=sparsity, **kwargs)
-    if model_type == "Local": mask = create_dendritic_sparse_scheduler_local(sparsity, w, args)
-    elif model_type == "Original": mask = create_dendritic_sparse_scheduler_original(sparsity, w, args)
+    if model_type == "Bounded": mask = create_dendritic_sparse_scheduler_local(sparsity, w, args)
+    elif model_type == "Wrap-around": mask = create_dendritic_sparse_scheduler_original(sparsity, w, args)
     else: raise ValueError(f"Unknown model type: {model_type}")
     return mask.cpu().numpy()
 
